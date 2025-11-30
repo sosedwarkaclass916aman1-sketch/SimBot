@@ -31,6 +31,7 @@ const DATA_FILE = "sent_ids.json";
 // ---------------------------------------------------------------
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
+
 // ---------------------------------------------------------------
 // TELEGRAM SENDER (with retry)
 // ---------------------------------------------------------------
@@ -55,6 +56,7 @@ async function sendMessage(text) {
   }
 }
 
+
 // ---------------------------------------------------------------
 // MESSAGE BUILDER
 // ---------------------------------------------------------------
@@ -67,9 +69,10 @@ function buildMessage(item, tag) {
   const price = item.priceSimboosts ?? "Unknown";
   const sellerName = item.seller?.company || "Unknown";
 
-  const border = quality >= 11
-    ? "✨🌟✨🌟✨🌟✨🌟✨🌟✨🌟✨"
-    : "────────────────────────────";
+  const border =
+    quality >= 11
+      ? "✨🌟✨🌟✨🌟✨🌟✨🌟✨🌟✨"
+      : "────────────────────────────";
 
   return `
 <b>${tag}</b>
@@ -96,6 +99,7 @@ https://www.simcompanies.com/market/collectibles/
 `;
 }
 
+
 // ---------------------------------------------------------------
 // FILTER
 // ---------------------------------------------------------------
@@ -114,36 +118,43 @@ function passesFilter(item) {
   return true;
 }
 
+
 // ---------------------------------------------------------------
-// FETCH WITH RETRY (FAST VERSION)
+// FETCH WITH STABLE TIMEOUT + RETRY
 // ---------------------------------------------------------------
 async function fetchData() {
-  for (let tries = 1; tries <= 2; tries++) {
+  for (let tryNum = 1; tryNum <= 3; tryNum++) {
     try {
       const res = await axios.get(API_URL, {
-        timeout: 2000,
+        timeout: 15000,   // <--- FIXED BIG TIMEOUT
         headers: {
           "User-Agent": "SimBot-Agent",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
       });
 
       return res.data;
 
     } catch (err) {
-      console.log(`⚠️ Fetch failed (try ${tries}) →`, err.code);
+      console.log(`⚠️ Fetch failed (try ${tryNum}) →`, err.code);
 
-      if (err.code === "ECONNRESET" || err.code === "ETIMEDOUT") {
-        await sleep(800);
+      if (
+        ["ECONNRESET", "ETIMEDOUT", "ECONNABORTED", "EAI_AGAIN"].includes(
+          err.code
+        )
+      ) {
+        await sleep(1000);
         continue;
       }
 
+      // non-network errors → throw
       throw err;
     }
   }
 
-  throw new Error("API unreachable after 2 attempts");
+  throw new Error("API unreachable after 3 attempts");
 }
+
 
 // ---------------------------------------------------------------
 // SENT STORAGE
@@ -160,6 +171,7 @@ function loadSent() {
 function saveSent(set) {
   fs.writeFileSync(DATA_FILE, JSON.stringify([...set], null, 2));
 }
+
 
 // ---------------------------------------------------------------
 // MAIN LOOP
@@ -193,14 +205,14 @@ async function start() {
         sent.add(uniqueKey);
         saveSent(sent);
 
-        await sleep(150); // FAST MSG DELAY
+        await sleep(150);
       }
     } catch (err) {
       console.log("Error:", err);
     }
 
     console.log("Cycle done");
-    await sleep(1000); // 1 SEC SCAN
+    await sleep(1000);
   }
 }
 
