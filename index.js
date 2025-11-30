@@ -188,7 +188,7 @@ async function start() {
       console.log("Error:", err);
     }
 
-    console.log("Cycle done");
+    console.log("Nothing New Found, Cycle done");
     await sleep(6000);
   }
 }
