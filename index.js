@@ -2,11 +2,18 @@
 //      SIMBOT – FINAL STABLE
 //  Retry System + No Spam + No Crash
 // ===============================
+// KEEP ALIVE SERVER FOR RENDER
 const express = require("express");
 const app = express();
 
-app.get("/", (req, res) => res.send("SimBot Running"));
-app.listen(3000, () => console.log("HTTP server for Render alive"));
+app.get("/", (req, res) => {
+  res.send("SimBot is running 24/7");
+});
+
+app.listen(3000, () => {
+  console.log("✔ Keep-alive server running on port 3000");
+});
+
 
 
 const axios = require("axios");
