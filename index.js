@@ -2,6 +2,12 @@
 //      SIMBOT – FINAL STABLE
 //  Retry System + No Spam + No Crash
 // ===============================
+const express = require("express");
+const app = express();
+
+app.get("/", (req, res) => res.send("SimBot Running"));
+app.listen(3000, () => console.log("HTTP server for Render alive"));
+
 
 const axios = require("axios");
 const fs = require("fs");
