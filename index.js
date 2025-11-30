@@ -1,7 +1,8 @@
 // ===============================
-//      SIMBOT – FINAL STABLE
-//  Retry System + No Spam + No Crash
+//      SIMBOT – FAST STABLE
+//     Turbo Scan + No Crash
 // ===============================
+
 // KEEP ALIVE SERVER FOR RENDER
 const express = require("express");
 const app = express();
@@ -13,8 +14,6 @@ app.get("/", (req, res) => {
 app.listen(3000, () => {
   console.log("✔ Keep-alive server running on port 3000");
 });
-
-
 
 const axios = require("axios");
 const fs = require("fs");
@@ -47,7 +46,6 @@ async function sendMessage(text) {
     const e = err.response?.data;
     console.log("Telegram Error:", e || err);
 
-    // If rate limit hit → wait
     if (e?.error_code === 429) {
       const wait = e.parameters?.retry_after || 5;
       console.log(`⏳ Telegram rate limit → waiting ${wait}s`);
@@ -117,13 +115,13 @@ function passesFilter(item) {
 }
 
 // ---------------------------------------------------------------
-// FETCH WITH RETRY (ECONNRESET FIX)
+// FETCH WITH RETRY (FAST VERSION)
 // ---------------------------------------------------------------
 async function fetchData() {
-  for (let tries = 1; tries <= 5; tries++) {
+  for (let tries = 1; tries <= 2; tries++) {
     try {
       const res = await axios.get(API_URL, {
-        timeout: 8000,
+        timeout: 2000,
         headers: {
           "User-Agent": "SimBot-Agent",
           "Accept": "application/json",
@@ -136,7 +134,7 @@ async function fetchData() {
       console.log(`⚠️ Fetch failed (try ${tries}) →`, err.code);
 
       if (err.code === "ECONNRESET" || err.code === "ETIMEDOUT") {
-        await sleep(1500);
+        await sleep(800);
         continue;
       }
 
@@ -144,7 +142,7 @@ async function fetchData() {
     }
   }
 
-  throw new Error("API unreachable after 5 attempts");
+  throw new Error("API unreachable after 2 attempts");
 }
 
 // ---------------------------------------------------------------
@@ -167,7 +165,7 @@ function saveSent(set) {
 // MAIN LOOP
 // ---------------------------------------------------------------
 async function start() {
-  console.log("\n🚀 SimBot Started Successfully...\n");
+  console.log("\n🚀 SimBot FAST Mode Started...\n");
 
   let sent = loadSent();
 
@@ -195,14 +193,14 @@ async function start() {
         sent.add(uniqueKey);
         saveSent(sent);
 
-        await sleep(700);
+        await sleep(150); // FAST MSG DELAY
       }
     } catch (err) {
       console.log("Error:", err);
     }
 
-    console.log("Nothing New Found, Cycle done");
-    await sleep(6000);
+    console.log("Cycle done");
+    await sleep(1000); // 1 SEC SCAN
   }
 }
 
