@@ -4,6 +4,18 @@
 // ===============================
 
 // KEEP ALIVE SERVER FOR RENDER
+// -------- Error Protection (Add at TOP, before anything else) --------
+process.on("unhandledRejection", (err) => {
+  console.log("Rejection:", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.log("Crash prevented:", err);
+});
+// ---------------------------------------------------------------------
+
+
+
 const express = require("express");
 const app = express();
 
