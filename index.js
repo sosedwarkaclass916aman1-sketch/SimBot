@@ -1,10 +1,9 @@
 // ===============================
-//      SIMBOT – FAST STABLE
-//     Turbo Scan + No Crash
+//      SIMBOT – FAST & CLEAN
+//     Unlimited Price Alerts
 // ===============================
 
-// KEEP ALIVE SERVER FOR RENDER
-// -------- Error Protection (Add at TOP, before anything else) --------
+// -------- Crash Protection --------
 process.on("unhandledRejection", (err) => {
   console.log("Rejection:", err);
 });
@@ -12,25 +11,14 @@ process.on("unhandledRejection", (err) => {
 process.on("uncaughtException", (err) => {
   console.log("Crash prevented:", err);
 });
-// ---------------------------------------------------------------------
+// ----------------------------------
 
-
-
-const express = require("express");
-const app = express();
-
-app.get("/", (req, res) => {
-  res.send("SimBot is running 24/7");
-});
-
-app.listen(3000, () => {
-  console.log("✔ Keep-alive server running on port 3000");
-});
 
 const axios = require("axios");
 const fs = require("fs");
 require("dotenv").config();
 
+// ENV
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const API_URL = process.env.API_URL;
@@ -114,31 +102,34 @@ https://www.simcompanies.com/market/collectibles/
 
 // ---------------------------------------------------------------
 // FILTER
+// (PRICE & QUALITY RESTRICTIONS REMOVED!)
 // ---------------------------------------------------------------
 function passesFilter(item) {
-  const seller = item.seller?.company || "";
-  const name = item.asset?.name || "";
-  const quality = parseInt(name.match(/Q(\d+)/)?.[1] || 0);
-  const price = item.priceSimboosts;
+  // datetime ko parse karo
+  const time = item.datetime ? new Date(item.datetime).getTime() : 0;
 
-  if (seller === "Trustee (NPC)") {
-    if (quality >= 6 && quality <= 8) return price < 30;
-    if (quality >= 9 && quality <= 10) return price < 60;
-    if (quality >= 11) return true;
-  }
+  // agar date time missing ho, ignore mat karo
+  if (!time) return true;
+
+  const age = Date.now() - time;
+
+  // 60 seconds se purana ho to ignore
+  if (age > 60000) return false;
 
   return true;
 }
 
 
+
+
 // ---------------------------------------------------------------
-// FETCH WITH STABLE TIMEOUT + RETRY
+// FETCH WITH RETRY & TIMEOUT
 // ---------------------------------------------------------------
 async function fetchData() {
   for (let tryNum = 1; tryNum <= 3; tryNum++) {
     try {
       const res = await axios.get(API_URL, {
-        timeout: 15000,   // <--- FIXED BIG TIMEOUT
+        timeout: 15000,
         headers: {
           "User-Agent": "SimBot-Agent",
           Accept: "application/json",
@@ -159,7 +150,6 @@ async function fetchData() {
         continue;
       }
 
-      // non-network errors → throw
       throw err;
     }
   }
@@ -189,7 +179,7 @@ function saveSent(set) {
 // MAIN LOOP
 // ---------------------------------------------------------------
 async function start() {
-  console.log("\n🚀 SimBot FAST Mode Started...\n");
+  console.log("\n🚀 SimBot (Unlimited Mode) Started...\n");
 
   let sent = loadSent();
 
@@ -203,13 +193,14 @@ async function start() {
         const uniqueKey = item.id;
         if (sent.has(uniqueKey)) continue;
 
+        // SET TAG
         let tag = "📢 New Collectible Found!";
         const seller = item.seller?.company || "";
 
         if (seller === "Trustee (NPC)") {
           tag = "🚨🔥 NPC Collectible Detected! 🔥🚨";
         } else if (["SAM BULL", "Shree Ram contractors"].includes(seller)) {
-          tag = "😌💎 Relax, Apna Hi Item Hai 💎😌";
+          tag = "😌💎 Relax, Apna Hi Item Hai (new) 💎😌";
         }
 
         await sendMessage(buildMessage(item, tag));
