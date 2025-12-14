@@ -13,9 +13,7 @@ process.on("uncaughtException", (err) => {
 });
 // ----------------------------------
 
-
 const axios = require("axios");
-const fs = require("fs");
 require("dotenv").config();
 
 // ENV
@@ -24,16 +22,14 @@ const CHAT_ID = process.env.CHAT_ID;
 const API_URL = process.env.API_URL;
 
 const SEND_URL = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-const DATA_FILE = "sent_ids.json";
 
 // ---------------------------------------------------------------
 // SLEEP
 // ---------------------------------------------------------------
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-
 // ---------------------------------------------------------------
-// TELEGRAM SENDER (with retry)
+// TELEGRAM SENDER (NON-BLOCKING)
 // ---------------------------------------------------------------
 async function sendMessage(text) {
   try {
@@ -56,9 +52,8 @@ async function sendMessage(text) {
   }
 }
 
-
 // ---------------------------------------------------------------
-// MESSAGE BUILDER
+// MESSAGE BUILDER (UNCHANGED DESIGN)
 // ---------------------------------------------------------------
 function buildMessage(item, tag) {
   const asset = item.asset;
@@ -99,34 +94,24 @@ https://www.simcompanies.com/market/collectibles/
 `;
 }
 
-
 // ---------------------------------------------------------------
-// FILTER
-// (PRICE & QUALITY RESTRICTIONS REMOVED!)
+// FILTER (SAME LOGIC – LAST 60s ONLY)
 // ---------------------------------------------------------------
 function passesFilter(item) {
-  // datetime ko parse karo
-  const time = item.datetime ? new Date(item.datetime).getTime() : 0;
-
-  // agar date time missing ho, ignore mat karo
+  const time = item.datetime ? Date.parse(item.datetime) : 0;
   if (!time) return true;
 
   const age = Date.now() - time;
-
-  // 60 seconds se purana ho to ignore
   if (age > 60000) return false;
 
   return true;
 }
 
-
-
-
 // ---------------------------------------------------------------
 // FETCH WITH RETRY & TIMEOUT
 // ---------------------------------------------------------------
 async function fetchData() {
-  for (let tryNum = 1; tryNum <= 3; tryNum++) {
+  for (let i = 1; i <= 3; i++) {
     try {
       const res = await axios.get(API_URL, {
         timeout: 15000,
@@ -135,87 +120,70 @@ async function fetchData() {
           Accept: "application/json",
         },
       });
-
       return res.data;
-
     } catch (err) {
-      console.log(`⚠️ Fetch failed (try ${tryNum}) →`, err.code);
+      console.log(`⚠️ Fetch failed (try ${i}) →`, err.code);
 
       if (
         ["ECONNRESET", "ETIMEDOUT", "ECONNABORTED", "EAI_AGAIN"].includes(
           err.code
         )
       ) {
-        await sleep(1000);
+        await sleep(300);
         continue;
       }
-
       throw err;
     }
   }
-
-  throw new Error("API unreachable after 3 attempts");
+  throw new Error("API unreachable");
 }
 
-
 // ---------------------------------------------------------------
-// SENT STORAGE
-// ---------------------------------------------------------------
-function loadSent() {
-  if (!fs.existsSync(DATA_FILE)) return new Set();
-  try {
-    return new Set(JSON.parse(fs.readFileSync(DATA_FILE, "utf8")));
-  } catch {
-    return new Set();
-  }
-}
-
-function saveSent(set) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify([...set], null, 2));
-}
-
-
-// ---------------------------------------------------------------
-// MAIN LOOP
+// MAIN LOOP (FAST + 60s MEMORY)
 // ---------------------------------------------------------------
 async function start() {
   console.log("\n🚀 SimBot (Unlimited Mode) Started...\n");
 
-  let sent = loadSent();
+  const sent = new Map(); // saleId → timestamp
 
   while (true) {
     try {
       const data = await fetchData();
+      const now = Date.now();
 
-      for (const item of data) {
+      // NEWEST FIRST
+      for (let i = data.length - 1; i >= 0; i--) {
+        const item = data[i];
+
         if (!passesFilter(item)) continue;
 
-        const uniqueKey = item.id;
-        if (sent.has(uniqueKey)) continue;
+        const id = item.id;
+        if (sent.has(id)) continue;
 
-        // SET TAG
         let tag = "📢 New Collectible Found!";
         const seller = item.seller?.company || "";
 
         if (seller === "Trustee (NPC)") {
           tag = "🚨🔥 NPC Collectible Detected! 🔥🚨";
         } else if (["SAM BULL", "Shree Ram contractors"].includes(seller)) {
-          tag = "😌💎 Relax, Apna Hi Item Hai (new) 💎😌";
+          tag = "😌💎 Relax, Apna Hi Item Hai (testing wala) 💎😌";
         }
 
-        await sendMessage(buildMessage(item, tag));
+        sendMessage(buildMessage(item, tag)).catch(console.error);
+        sent.set(id, now);
+      }
 
-        sent.add(uniqueKey);
-        saveSent(sent);
-
-        await sleep(150);
+      // 🧹 CLEAN IDs OLDER THAN 60s
+      for (const [id, time] of sent) {
+        if (now - time > 60000) {
+          sent.delete(id);
+        }
       }
     } catch (err) {
       console.log("Error:", err);
     }
 
-    console.log("Cycle done");
-    await sleep(1000);
+    await sleep(300); // FAST SCAN
   }
 }
 
